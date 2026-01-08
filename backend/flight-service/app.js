@@ -87,70 +87,77 @@ app.post('/api/flights', async (req, res) => {
 
 // Uçuş Arama
 app.get('/api/flights/search', async (req, res) => {
+    const { from, to, date, flexible, directOnly, passengers } = req.query;
+    const passengerCount = parseInt(passengers) || 1;
+    
+    let whereClause = {
+        fromCity: from,
+        toCity: to,
+        capacity: { [Op.gte]: passengerCount } // Seçilen yolcu sayısı kadar yer olmalı
+    };
+
+    if (date && date !== "") {
+        if (flexible === 'true') { // Query params string gelir
+            const searchDate = new Date(date);
+            const startDate = new Date(searchDate);
+            startDate.setDate(searchDate.getDate() - 3);
+            const endDate = new Date(searchDate);
+            endDate.setDate(searchDate.getDate() + 3);
+
+            whereClause.flightDate = {
+                [Op.between]: [
+                    startDate.toISOString().split('T')[0], 
+                    endDate.toISOString().split('T')[0]
+                ]
+            };
+        } else {
+            whereClause.flightDate = date;
+        }
+    }
+
+    if (directOnly === 'true') {
+        whereClause.isDirect = true; 
+    }
+
     try {
-        const { from, to, date } = req.query;
-        const flights = await Flight.findAll({
-            where: {
-                fromCity: { [Op.iLike]: `%${from.trim()}%` },
-                toCity: { [Op.iLike]: `%${to.trim()}%` },
-                flightDate: date
-            }
-        });
+        const flights = await Flight.findAll({ where: whereClause });
         res.json(flights);
     } catch (error) {
-        res.status(500).json({ error: "Arama hatası" });
+        res.status(500).json({ error: error.message });
     }
 });
 
 // BİLET ALMA (MİLLER VE ÜYELİK DAHİL)
+// Bilet Satın Alma Endpoint'i
 app.post('/api/flights/book/:id', async (req, res) => {
-    const flightId = req.params.id;
-    const { email, useMiles, isMemberRequest } = req.body; 
+    const flightId = req.params.id; // URL'den gelen uçuş ID'si
+    const { email, useMiles, isMemberRequest, passengers } = req.body; 
+    const passengerCount = parseInt(passengers) || 1;
 
     try {
-        const flight = await Flight.findByPk(flightId);
+        // Sadece URL'deki ID'ye sahip uçuşu getiriyoruz
+        const flight = await Flight.findByPk(flightId); 
+        
         if (!flight) return res.status(404).json({ error: "Uçuş bulunamadı" });
-        if (!email) return res.status(400).json({ error: "E-posta gerekli." });
 
-        const ticketPrice = parseFloat(flight.price);
-        const requiredMiles = ticketPrice * 10; // 1$ = 10 Mil kuralı
+        if (flight.capacity < passengerCount) {
+            return res.status(400).json({ error: `Yetersiz koltuk! Sadece ${flight.capacity} yer kaldı.` });
+        }
 
-        // Transaction Başlat
         await Flight.sequelize.transaction(async (t) => {
-            
-            // 1. Üyelik İşlemi (İsteyen üye olur)
-            if (isMemberRequest) {
-                const [userProfile, created] = await UserProfile.findOrCreate({
-                    where: { email: email },
-                    defaults: { milesBalance: 0, membershipType: 'Classic' },
-                    transaction: t
-                });
-
-                // Yeni üye ise SQS üzerinden Hoş Geldin maili
-                if (created) {
-                    await sqsClient.send(new SendMessageCommand({
-                        QueueUrl: QUEUE_URL,
-                        MessageBody: JSON.stringify({
-                            email: email,
-                            type: "WELCOME_EMAIL",
-                            message: "Miles & Smiles dünyasına hoş geldiniz! Üyeliğiniz başarıyla oluşturuldu."
-                        })
-                    }));
-                }
-            }
-
-            // 2. Ödeme Yöntemi Kontrolü
             if (useMiles) {
                 const profile = await UserProfile.findOne({ where: { email }, transaction: t });
-                if (!profile) throw new Error("Mil harcamak için Miles&Smiles üyesi olmalısınız!");
-                if (profile.milesBalance < requiredMiles) {
-                    throw new Error(`Yetersiz mil! Gereken: ${requiredMiles}, Mevcut: ${profile.milesBalance}`);
-                }
+                if (!profile) throw new Error("Mil kullanmak için üye olmalısınız!");
+                // Mil maliyeti hesaplama ve düşme
+                const requiredMiles = (flight.price * 10) * passengerCount;
+                if (profile.milesBalance < requiredMiles) throw new Error("Yetersiz mil!");
                 await profile.decrement('milesBalance', { by: requiredMiles, transaction: t });
             }
 
-            // 3. Kapasite ve Rezervasyon
-            await flight.update({ capacity: flight.capacity - 1 }, { transaction: t });
+            // Sadece BULUNAN uçuşun kapasitesini azaltıyoruz
+            await flight.update({ capacity: flight.capacity - passengerCount }, { transaction: t });
+            
+            // Rezervasyon kaydı
             await Booking.create({ 
                 flightId: flight.id, 
                 userEmail: email, 
@@ -158,49 +165,50 @@ app.post('/api/flights/book/:id', async (req, res) => {
             }, { transaction: t });
         });
 
-        // 4. Bilet Onay Maili (SQS üzerinden)
-        await sqsClient.send(new SendMessageCommand({
-            QueueUrl: QUEUE_URL,
-            MessageBody: JSON.stringify({
-                email: email,
-                type: "TICKET_CONFIRMATION",
-                message: useMiles 
-                    ? `Tebrikler! ${requiredMiles} mil kullanarak biletinizi aldınız.`
-                    : `${flight.flightCode} uçuşu için biletiniz onaylanmıştır.`
-            })
-        }));
-
-        res.json({ message: useMiles ? "Millerinizle bilet alındı! 🎫" : "Biletiniz onaylandı! ✈️" });
-
+        res.json({ message: `${passengerCount} adet bilet onaylandı! ✈️` });
     } catch (error) {
-        console.error("İşlem Hatası:", error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
 // NIGHTLY PROCESS (Her dakika başında çalışır)
-cron.schedule('* * * * *', async () => {
-    console.log("🌙 Nightly Process: Mil Hesaplaması Başladı...");
+cron.schedule('0 0 * * *', async () => {
+    console.log("🌙 Nightly Process Başladı...");
     try {
         const today = new Date().toISOString().split('T')[0];
+        
+        // 1. Uçuşu tamamlanmış biletleri bul
         const pastBookings = await Booking.findAll({
-            include: [{ model: Flight, where: { flightDate: { [Op.lt]: today } } }]
+            where: { status: 'CONFIRMED' },
+            include: [{ 
+                model: Flight, 
+                where: { flightDate: { [Op.lt]: today } } 
+            }]
         });
 
         for (let booking of pastBookings) {
-            const flight = booking.Flight;
-            const earnedMiles = Math.floor(flight.price * 0.1);
-            
-            // Sadece sistemde profili olan (üye olan) kullanıcılara mil yükle
+            const earnedMiles = Math.floor(booking.Flight.price * 0.1);
             const profile = await UserProfile.findOne({ where: { email: booking.userEmail } });
-            
+
             if (profile) {
+                // Milleri güncelle
                 await profile.increment('milesBalance', { by: earnedMiles });
-                console.log(`✅ ${booking.userEmail} için ${earnedMiles} mil yüklendi.`);
+                await booking.update({ status: 'COMPLETED' });
+
+                // PDF: Send email if points added
+                await sqsClient.send(new SendMessageCommand({
+                    QueueUrl: QUEUE_URL,
+                    MessageBody: JSON.stringify({
+                        email: booking.userEmail,
+                        type: "MILES_ADDED",
+                        subject: "Uçuşunuz Tamamlandı: Mil Kazandınız!",
+                        message: `${booking.Flight.flightCode} uçuşunuz için ${earnedMiles} mil yüklendi. Keyifli harcamalar!`
+                    })
+                }));
             }
         }
     } catch (error) {
-        console.error("❌ Nightly Process Hatası:", error);
+        console.error("❌ Scheduled Task Hatası:", error);
     }
 });
 
@@ -221,6 +229,39 @@ app.get('/api/user/profile/:email', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: "Profil bilgileri alınamadı." });
+    }
+});
+
+// Diğer havayollarının mil güncelleyebileceği servis
+app.post('/api/external/update-miles', async (req, res) => {
+    const apiKey = req.headers['x-api-key'];
+    
+    // PDF: This will be an authenticated service
+    if (apiKey !== process.env.EXTERNAL_AIRLINE_KEY) {
+        return res.status(401).json({ error: "Yetkisiz erişim!" });
+    }
+
+    const { email, milesToAdd } = req.body;
+    try {
+        const profile = await UserProfile.findOne({ where: { email } });
+        if (!profile) return res.status(404).json({ error: "Üye bulunamadı" });
+
+        await profile.increment('milesBalance', { by: milesToAdd });
+        
+        // SQS'e bildirim at (Mail gönderimi için)
+        await sqsClient.send(new SendMessageCommand({
+            QueueUrl: QUEUE_URL,
+            MessageBody: JSON.stringify({
+                email: email,
+                type: "MILES_ADDED",
+                subject: "Ortak Havayolundan Mil Kazandınız!",
+                message: `Anlaşmalı havayolu uçuşunuzdan ${milesToAdd} mil hesabınıza yüklendi.`
+            })
+        }));
+
+        res.json({ message: "Miller başarıyla güncellendi." });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

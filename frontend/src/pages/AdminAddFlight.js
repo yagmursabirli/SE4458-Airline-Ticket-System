@@ -5,6 +5,7 @@ import {
 import axios from 'axios';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { signOut } from 'aws-amplify/auth';
 
 const AdminAddFlight = () => {
   const [flightData, setFlightData] = useState({
@@ -18,7 +19,7 @@ const AdminAddFlight = () => {
 
  const handleSave = async () => {
     try {
-        const response = await axios.post('http://localhost:5000/api/flights', flightData, {
+        const response = await axios.post('http://localhost:8080/api/flights', flightData, {
             headers: { 'x-user-role': 'ADMIN' } // Backend güvenliği için
         });
         alert(response.data.message);

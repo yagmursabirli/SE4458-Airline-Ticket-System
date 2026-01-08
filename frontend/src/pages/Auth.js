@@ -31,7 +31,7 @@ const Auth = ({ onLoginSuccess }) => {
 
                 if (isMilesSmilesChecked) {
                     try {
-                        await axios.post('http://localhost:5000/api/user/register-loyalty', {
+                        await axios.post('http://localhost:8080/api/user/register-loyalty', {
                             email: formData.email,
                             wantsMembership: true
                         });
@@ -82,7 +82,7 @@ const Auth = ({ onLoginSuccess }) => {
             >
                 <Typography variant="h5" align="center" gutterBottom sx={{ fontWeight: 'bold' }}>
                     {isSignUp ? (step === 1 ? "Yeni Hesap Oluştur" : "Kodu Onayla") : 
-                    (isAdminPart ? "✈️ Airline Admin Login" : "Miles&Smiles Üye Girişi")}
+                    (isAdminPart ? "✈️ Airline Admin Login" : "Üye Girişi")}
                 </Typography>
 
                 <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>

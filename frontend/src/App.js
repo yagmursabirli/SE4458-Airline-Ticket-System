@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Amplify } from 'aws-amplify';
 import { getCurrentUser, fetchUserAttributes, fetchAuthSession } from 'aws-amplify/auth';
 import awsConfig from './aws-config';
+import { signOut } from 'aws-amplify/auth';
 
 // Sayfalar
 import Auth from './pages/Auth';
@@ -61,12 +62,18 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setUserEmail("");
-    setIsAdmin(false);
-    window.location.reload(); 
-  };
+  const handleLogout = async () => {
+    try {
+        await signOut(); // AWS oturumunu gerçekten kapat
+        setUser(null);
+        setUserEmail("");
+        setIsAdmin(false);
+        // Sayfayı tamamen temizleyerek kök dizine (login ekranına) gönder
+        window.location.href = window.location.origin; 
+    } catch (error) {
+        console.error("Çıkış hatası:", error);
+    }
+};
 
   if (loading) return null;
 
@@ -90,16 +97,19 @@ function App() {
                   </Container>
                 </>
               ) : (
-                <Box sx={{ p: 5, textAlign: 'center' }}>
-                  <Typography variant="h5" color="error" gutterBottom>
-                    YETKİSİZ ERİŞİM
-                  </Typography>
-                  <Typography sx={{ mb: 2 }}>
-                    Bu alan sadece yönetici yetkisine sahip kullanıcılar içindir.
-                  </Typography>
-                  <Button variant="contained" onClick={handleLogout}>Çıkış Yap ve Geri Dön</Button>
-                </Box>
-              )
+  <Box sx={{ p: 5, textAlign: 'center' }}>
+    <Typography variant="h5" color="error" gutterBottom>
+      YETKİSİZ ERİŞİM
+    </Typography>
+    <Typography sx={{ mb: 2 }}>
+      Bu alan sadece yönetici yetkisine sahip kullanıcılar içindir.
+    </Typography>
+    {/* handleLogout'u burada tetikliyoruz */}
+    <Button variant="contained" onClick={handleLogout}> 
+       OTURUMU KAPAT VE YENİDEN DENE
+    </Button>
+  </Box>
+)
             )
           } />
           <Route path="*" element={<Navigate to="/" />} />
@@ -121,7 +131,7 @@ function App() {
               <Container sx={{ mt: 4 }}>
                 <Profile userEmail={userEmail} />
                 <Box sx={{ my: 4 }} />
-                <SearchFlights userEmail={userEmail} />
+               
               </Container>
             </>
           )
