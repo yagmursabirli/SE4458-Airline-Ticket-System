@@ -4,7 +4,7 @@ const cron = require('node-cron');
 const { Op } = require('sequelize'); 
 const Flight = require('./models/Flight'); 
 const Booking = require('./models/Booking');
-const UserProfile = require('./models/UserProfile');
+const UserProfile = require('./models/User');
 require('dotenv').config();
 
 const client = new SQSClient({ region: "eu-north-1" });
@@ -18,7 +18,6 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// --- GÖREV 1: ANLIK KUYRUK İŞLEME (SQS) ---
 async function pollMessages() {
     console.log("📨 SQS Dinleyici Aktif...");
     while (true) {
@@ -50,40 +49,47 @@ async function pollMessages() {
     }
 }
 
-// --- GÖREV 2: GECE MİL GÜNCELLEME (SCHEDULER) ---
 cron.schedule('0 0 * * *', async () => {
-    console.log("🌙 Gece Süreci: Uçuş fiyatına göre miller hesaplanıyor...");
+    console.log("🌙 Gece Süreci Başladı: Tamamlanan uçuşların milleri hesaplanıyor...");
     const today = new Date().toISOString().split('T')[0];
 
     try {
-        // 1. Bugünün tarihli uçuşlarını bul
+        // Bugünün uçuşlarını bul
         const completedFlights = await Flight.findAll({
             where: { flightDate: today }
         });
 
         for (const flight of completedFlights) {
-            // 2. Bu uçuşa ait tüm rezervasyonları bul
+            // Bu uçuşa ait onaylı tüm rezervasyonları bul
             const bookings = await Booking.findAll({
-                where: { flightId: flight.id }
+                where: { 
+                    flightId: flight.id,
+                    status: 'CONFIRMED' // Sadece satın alınmış/onaylı olanlar
+                }
             });
 
-            // 3. Mil Hesaplama: Uçuş fiyatının %10'u
-            const earnedMiles = Math.floor(flight.price * 0.10); // 
+            // %10 mil hesapla
+            const earnedMiles = Math.floor(flight.price * 0.10); 
 
             for (const booking of bookings) {
-                // 4. Kullanıcının Miles&Smiles profilini bul ve mil ekle
-                const profile = await UserProfile.findByPk(booking.userEmail);
-                if (profile) {
+                // UserProfile modelinde email PRIMARY KEY ise findByPk(email) kullanılır
+                const profile = await UserProfile.findOne({ where: { email: booking.userEmail } });
+                
+                if (profile && earnedMiles > 0) {
+                    // Milleri ekle
                     await profile.increment('milesBalance', { by: earnedMiles });
+                    
+                    // Statü güncelle (Tekrar mil kazanmasın diye opsiyonel olarak eklenebilir)
+                    // await booking.update({ status: 'COMPLETED' });
 
-                    // 5. Bilgilendirme Maili At
+                    // Mail gönder
                     await transporter.sendMail({
                         from: process.env.EMAIL_USER,
                         to: profile.email,
                         subject: 'Tebrikler, Milleriniz Yüklendi! ✈️',
-                        text: `Sayın üyemiz, ${flight.flightCode} kodlu uçuşunuz tamamlanmıştır. Uçuş bedelinin %10'u olan ${earnedMiles} mil hesabınıza eklenmiştir. Keyifli uçuşlar dileriz!`
+                        text: `Sayın üyemiz, ${flight.flightCode} kodlu uçuşunuz tamamlanmıştır. ${earnedMiles} mil hesabınıza eklenmiştir.`
                     });
-                    console.log(`✅ ${earnedMiles} mil eklendi: ${profile.email}`);
+                    console.log(`✅ ${earnedMiles} mil eklendi ve mail gönderildi: ${profile.email}`);
                 }
             }
         }

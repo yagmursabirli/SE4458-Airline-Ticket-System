@@ -19,6 +19,9 @@ const sqsClient = new SQSClient({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
     }
 });
+//const QUEUE_URL = "https://sqs.eu-north-1.amazonaws.com/684210808058/AirlineNotificationQueue";
+
+const sqs = new SQSClient({ region: "eu-north-1" });
 const QUEUE_URL = "https://sqs.eu-north-1.amazonaws.com/684210808058/AirlineNotificationQueue";
 
 // Modeller arası ilişkiler
@@ -27,13 +30,13 @@ Flight.hasMany(Booking, { foreignKey: 'flightId' });
 
 const app = express();
 
-// CORS yapılandırmasına v1 adreslerini de kapsayacak şekilde izin veriyoruz
+// CORS yapılandırmasına v1 adreslerini de kapsayacak şekilde
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:3001']
 }));
 app.use(express.json());
 
-// Veritabanı Senkronizasyonu
+
 Flight.sequelize.sync().then(() => {
     console.log("🚀 AWS RDS: Tüm tablolar güncellendi ve hazır!");
 });
@@ -42,7 +45,7 @@ Flight.sequelize.sync().then(() => {
 const v1Router = express.Router();
 app.use('/api/v1', v1Router);
 
-// --- ENDPOINT'LER (v1 üzerinden) ---
+
 
 // KULLANICI KAYIT / SADAKAT PROGRAMI
 v1Router.post('/user/register-loyalty', async (req, res) => {
@@ -85,11 +88,11 @@ v1Router.post('/flights', async (req, res) => {
     }
 });
 
-// UÇUŞ ARAMA (PAGINATION DESTEĞİ EKLENDİ)
+// UÇUŞ ARAMA 
 v1Router.get('/flights/search', async (req, res) => {
-    const { from, to, passengers, page = 1, limit = 10, directOnly } = req.query;
     
-    // Pagination hesaplama
+    const { from, to, date, flexible, passengers, page = 1, limit = 10, directOnly } = req.query;
+    
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     let whereClause = {
@@ -97,6 +100,28 @@ v1Router.get('/flights/search', async (req, res) => {
         toCity: to,
         capacity: { [Op.gte]: parseInt(passengers) || 1 }
     };
+
+    
+    if (date && date !== "") {
+        if (flexible === 'true' || flexible === true) {
+            // Esnek tarih: +/- 3 gün aralığı
+            const d = new Date(date);
+            const startDate = new Date(d);
+            startDate.setDate(d.getDate() - 3);
+            const endDate = new Date(d);
+            endDate.setDate(d.getDate() + 3);
+
+            whereClause.flightDate = {
+                [Op.between]: [
+                    startDate.toISOString().split('T')[0],
+                    endDate.toISOString().split('T')[0]
+                ]
+            };
+        } else {
+            // Kesin tarih
+            whereClause.flightDate = date;
+        }
+    }
 
     if (directOnly === 'true') {
         whereClause.stops = 'zero'; 
@@ -114,7 +139,7 @@ v1Router.get('/flights/search', async (req, res) => {
             totalItems: count,
             totalPages: Math.ceil(count / limit),
             currentPage: parseInt(page),
-            flights: rows
+            flights: rows 
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -124,29 +149,59 @@ v1Router.get('/flights/search', async (req, res) => {
 // BİLET SATIN ALMA
 v1Router.post('/flights/book/:id', async (req, res) => {
     const flightId = req.params.id;
-    const { email, useMiles, passengers } = req.body; 
+    const { email, useMiles, passengers } = req.body;
     const passengerCount = parseInt(passengers) || 1;
 
     try {
-        const flight = await Flight.findByPk(flightId); 
-        if (!flight || flight.capacity < passengerCount) throw new Error("Kapasite yetersiz.");
+        const flight = await Flight.findByPk(flightId);
+        if (!flight || flight.capacity < passengerCount)
+            throw new Error("Kapasite yetersiz.");
 
         await Flight.sequelize.transaction(async (t) => {
             if (useMiles) {
-                const profile = await UserProfile.findOne({ where: { email }, transaction: t });
+                const profile = await UserProfile.findOne({
+                    where: { email },
+                    transaction: t
+                });
+
                 const requiredMiles = (flight.price * 10) * passengerCount;
-                if (!profile || profile.milesBalance < requiredMiles) throw new Error("Yetersiz mil.");
-                await profile.decrement('milesBalance', { by: requiredMiles, transaction: t });
+                if (!profile || profile.milesBalance < requiredMiles)
+                    throw new Error("Yetersiz mil.");
+
+                await profile.decrement('milesBalance', {
+                    by: requiredMiles,
+                    transaction: t
+                });
             }
-            await flight.update({ capacity: flight.capacity - passengerCount }, { transaction: t });
-            await Booking.create({ flightId: flight.id, userEmail: email, status: 'CONFIRMED' }, { transaction: t });
+
+            await flight.update(
+                { capacity: flight.capacity - passengerCount },
+                { transaction: t }
+            );
+
+            await Booking.create({
+                flightId: flight.id,
+                userEmail: email,
+                status: 'CONFIRMED'
+            }, { transaction: t });
         });
 
-        res.json({ message: "Biletiniz onaylandı (v1)." });
+        // ✅ TRANSACTION BAŞARILI → MAIL TETİKLE
+        await sqs.send(new SendMessageCommand({
+            QueueUrl: QUEUE_URL,
+            MessageBody: JSON.stringify({
+                email,
+                message: `✈️ ${flight.flightCode} uçuşu için biletiniz başarıyla satın alındı.`
+            })
+        }));
+
+        res.json({ message: "Biletiniz onaylandı." });
+
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
 
 // PROFİL VE REZERVASYONLAR
 v1Router.get('/user/profile/:email', async (req, res) => {
@@ -184,12 +239,60 @@ v1Router.post('/external/update-miles', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-
-// CRON JOB (NIGHTLY PROCESS)
+//notification worker a koyduğum için yoruma aldım 
+/*
+// CRON JOB: Her gece 00:00'da çalışır
 cron.schedule('0 0 * * *', async () => {
-    console.log("🌙 Nightly Process v1 Çalışıyor...");
-    // ... (Mil yükleme mantığı aynı kalabilir)
-});
+    console.log("🌙 Nightly Process: Günlük uçuş milleri hesaplanıyor...");
+    
+    try {
+        
+        const today = new Date().toISOString().split('T')[0];
 
+        
+        const completedBookings = await Booking.findAll({
+            where: { status: 'CONFIRMED' },
+            include: [{
+                model: Flight,
+                where: { flightDate: today } 
+            }]
+        });
+
+        if (completedBookings.length === 0) {
+            console.log("🛬 Bugün tamamlanmış uçuş veya rezervasyon bulunamadı.");
+            return;
+        }
+
+        console.log(`📊 Bugün tamamlanan ${completedBookings.length} bilet işlemi bulundu. Miller aktarılıyor...`);
+
+        for (const booking of completedBookings) {
+            const userEmail = booking.userEmail;
+            const flightPrice = booking.Flight.price; 
+            const earnedMiles = Math.floor(flightPrice * 0.10); 
+
+            
+            const profile = await UserProfile.findOne({ where: { email: userEmail } });
+
+            if (profile && earnedMiles > 0) {
+                await profile.increment('milesBalance', { by: earnedMiles });
+                console.log(`✅ ${userEmail} adresine ${earnedMiles} mil eklendi. (Uçuş: ${booking.Flight.flightCode})`);
+
+                // SQS ile bildirim gönder
+                await sqsClient.send(new SendMessageCommand({
+                    QueueUrl: QUEUE_URL,
+                    MessageBody: JSON.stringify({
+                        email: userEmail,
+                        type: "FLIGHT_MILES_EARNED",
+                        message: `Sayın üyemiz, bugün tamamladığınız ${booking.Flight.flightCode} sefer sayılı uçuşunuzdan ${earnedMiles} mil kazandınız!`
+                    })
+                }));
+            }
+        }
+        console.log("✅ Gece işlemi başarıyla tamamlandı.");
+
+    } catch (error) {
+        console.error("❌ Cron Job Hatası:", error);
+    }
+});*/
 const PORT = 5000;
 app.listen(PORT, () => console.log(`✅ Flight Service v1 Aktif: ${PORT}`));

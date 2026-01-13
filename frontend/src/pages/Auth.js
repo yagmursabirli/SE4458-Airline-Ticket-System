@@ -7,7 +7,7 @@ import {
 import axios from 'axios';
 
 const Auth = ({ onLoginSuccess }) => {
-    // Port 3001 ise Admin domaini kabul edilir
+    // Port 3001 Admin domaini 
     const isAdminPart = window.location.port === "3001";
     
     const [isSignUp, setIsSignUp] = useState(false);
@@ -43,25 +43,22 @@ const Auth = ({ onLoginSuccess }) => {
                 setIsSignUp(false);
                 setStep(1);
             } else {
-                // 1. Giriş İşlemi
                 const user = await signIn({ username: formData.email, password: formData.password });
                 
                 // 2. AWS Cognito'dan Kullanıcı Gruplarını (Rolleri) Çekme
                 const session = await fetchAuthSession();
                 const groups = session.tokens?.accessToken?.payload['cognito:groups'] || [];
-                
-                // PDF Kuralı: "Users who can use this screen will be in ADMIN role"
+
                 const isUserAdmin = groups.includes('Admins');
 
-                // 3. Yetki Kontrolü
+
                 if (isAdminPart && !isUserAdmin) {
                     alert("YETKİ HATASI: Bu domain sadece 'Admins' grubundaki kullanıcılar içindir.");
                     return;
                 }
 
                 alert(isAdminPart ? "Admin Paneline Hoş Geldiniz!" : "Giriş Başarılı!");
-                
-                // user nesnesine isAdmin bilgisini ekleyerek App.js'e gönderiyoruz
+
                 onLoginSuccess({ ...user, isAdmin: isUserAdmin });
             }
         } catch (error) {

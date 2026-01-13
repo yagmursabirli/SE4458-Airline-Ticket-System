@@ -6,7 +6,7 @@ const Navbar = ({ onLogout, userEmail }) => {
     const handleSignOut = async () => {
         try {
             await signOut();
-            onLogout(); // App.js'deki login durumunu sıfırlayacak
+            onLogout(); 
             alert("Başarıyla çıkış yapıldı.");
         } catch (error) {
             console.error('Çıkış yapılırken hata:', error);
@@ -24,7 +24,7 @@ const Navbar = ({ onLogout, userEmail }) => {
                         {userEmail}
                     </Typography>
                     <Button color="inherit" onClick={handleSignOut} sx={{ border: '1px solid white' }}>
-                        Çıkış Yap
+                        Log out
                     </Button>
                 </Box>
             </Toolbar>

@@ -11,14 +11,11 @@ app.use(cors());
 const myCache = new NodeCache({ stdTTL: 3600 });
 console.log('🚀 Memory Cache Aktif');
 
-// ===========================================
-// FLIGHT SEARCH (v1, CACHE’Lİ, PAGINATION DESTEKLİ)
-// ===========================================
-// PDF: REST services must be versionable. Artık /v1 üzerinden hizmet veriyoruz.
+
 app.get('/api/v1/flights/search', async (req, res) => {
     const { from, to, date, passengers, flexible, directOnly, page = 1, limit = 10 } = req.query;
 
-    // Cache anahtarına page ve limit ekledik ki farklı sayfalar birbirine karışmasın
+    
     const cacheKey = `search-${from}-${to}-${date}-${passengers}-${flexible}-${directOnly}-p${page}-l${limit}`;
     const cached = myCache.get(cacheKey);
 
@@ -52,9 +49,14 @@ app.get('/api/v1/flights/search', async (req, res) => {
 // Proxy üzerinden v1 yönlendirmesi
 app.use('/api/v1', createProxyMiddleware({
     target: 'http://localhost:5000/api/v1',
-    changeOrigin: true
+    changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+       
+        if (req.headers['x-user-role']) {
+            proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+        }
+    }
 }));
-
 const PORT = 8080;
 app.listen(PORT, () =>
     console.log(`🛡️ Gateway v1 ${PORT} portunda aktif`)

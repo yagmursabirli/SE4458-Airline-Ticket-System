@@ -1,6 +1,6 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
-// Komutun çalıştırıldığı dizindeki .env'i oku (En garantici yöntem)
+
 require('dotenv').config({ path: path.join(process.cwd(), '.env') }); 
 
 

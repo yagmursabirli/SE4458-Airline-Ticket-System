@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
-const Flight = require('./Flight'); // Flight.js zaten sequelize'ı içinde barındırıyor
+const Flight = require('./Flight'); 
 
-// Flight modelinin içindeki sequelize bağlantısını kullanıyoruz
+
 const Booking = Flight.sequelize.define('Booking', {
     id: {
         type: DataTypes.INTEGER,
@@ -22,7 +22,7 @@ const Booking = Flight.sequelize.define('Booking', {
     }
 });
 
-// İlişkiler (PDF Sayfa 4 gereği: Transaction ve Mile hesaplama için şart)
+
 Flight.hasMany(Booking, { foreignKey: 'flightId' });
 Booking.belongsTo(Flight, { foreignKey: 'flightId' });
 

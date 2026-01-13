@@ -1,18 +1,18 @@
 const { DataTypes } = require('sequelize');
-const Flight = require('./Flight'); // Mevcut bağlantıyı kullanmak için
+const Flight = require('./Flight'); 
 
 const UserProfile = Flight.sequelize.define('UserProfile', {
     email: {
         type: DataTypes.STRING,
-        primaryKey: true, // Emaili anahtar yapıyoruz
+        primaryKey: true, 
         allowNull: false
     },
     milesBalance: {
         type: DataTypes.INTEGER,
-        defaultValue: 0 // Yeni üyeler 0 mil ile başlar
+        defaultValue: 0 
     },
     membershipType: {
-        type: DataTypes.STRING, // Classic, Gold, Elite (PDF İsteği)
+        type: DataTypes.STRING, 
         defaultValue: 'Classic'
     }
 });

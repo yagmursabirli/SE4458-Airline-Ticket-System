@@ -5,7 +5,7 @@ import {
     FormControlLabel, Checkbox 
 } from '@mui/material';
 import axios from 'axios';
-import SearchFlights from './SearchFlights'; // Dosyayı import ediyoruz
+import SearchFlights from './SearchFlights'; 
 
 const Profile = ({ userEmail }) => {
     const [profileData, setProfileData] = useState({ milesBalance: 0, membershipType: null, bookings: [] });

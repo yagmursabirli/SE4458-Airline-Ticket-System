@@ -10,7 +10,6 @@ const AdminAddFlight = () => {
   const [flightData, setFlightData] = useState({
     fromCity: '', toCity: '', flightDate: null,
     flightCode: '', duration: '', price: '', capacity: '',
-    // ML Modeli için gerekli yeni alanlar 
     airline: 'Air_India',
     departure_time: 'Morning',
     stops: 'one'
@@ -20,20 +19,52 @@ const AdminAddFlight = () => {
     setFlightData({ ...flightData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = async () => {
-    try {
-      const response = await axios.post('http://localhost:8080/api/v1/flights', flightData, {
-        headers: { 'x-user-role': 'ADMIN' } 
-      });
-      alert("Uçuş başarıyla kaydedildi!");
-    } catch (error) {
-      alert("Yetkisiz işlem veya hata!");
+ const handleSave = async () => {
+
+    const formattedDate = flightData.flightDate && flightData.flightDate.isValid() 
+      ? flightData.flightDate.format('YYYY-MM-DD') 
+      : null;
+
+    if (!formattedDate) {
+      alert("Lütfen geçerli bir uçuş tarihi seçin!");
+      return;
     }
-  };
+
+
+    const dataToSend = {
+      fromCity: String(flightData.fromCity).trim(),
+      toCity: String(flightData.toCity).trim(),
+      flightDate: formattedDate,
+      flightCode: String(flightData.flightCode).trim(),
+      duration: String(flightData.duration), 
+      price: parseFloat(flightData.price),
+      capacity: parseInt(flightData.capacity),
+      predictedPrice: flightData.price ? parseFloat(flightData.price) : null,
+      stops: flightData.stops || 'zero'
+    };
+
+    if (!dataToSend.fromCity || !dataToSend.toCity || !dataToSend.flightCode) {
+      alert("Lütfen Nereden, Nereye ve Uçuş Kodu alanlarını doldurun!");
+      return;
+    }
+
+    try {
+      const response = await axios.post('http://localhost:8080/api/v1/flights', dataToSend, {
+        headers: { 
+          'x-user-role': 'ADMIN',
+          'Content-Type': 'application/json'
+        } 
+      });
+      alert("✅ Uçuş AWS RDS veritabanına başarıyla kaydedildi!");
+    } catch (error) {
+      console.error("Kaydetme Hatası Detayı:", error.response?.data);
+      const detail = error.response?.data?.error || "Veri formatı modelle uyuşmuyor.";
+      alert("❌ Kayıt başarısız! \nDetay: " + detail);
+    }
+};
 
   const handlePredict = async () => {
     try {
-      // Python Flask servisine tüm parametreleri gönderiyoruz 
       const response = await axios.post('http://localhost:5001/predict', {
         duration: flightData.duration,
         fromCity: flightData.fromCity,
@@ -59,7 +90,7 @@ const AdminAddFlight = () => {
     <Container maxWidth="sm" sx={{ mt: 5 }}>
       <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
         <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          ✈️ Flight Entry (Admin) [cite: 5, 6]
+          ✈️ Flight Entry (Admin)
         </Typography>
         
         <Grid container spacing={2}>
