@@ -14,7 +14,7 @@ const FlightRow = ({ flight, userEmail, passengers, onBookingSuccess }) => {
         }
 
         try {
-            const response = await axios.post(`http://localhost:8080/api/flights/book/${flight.id}`, {
+            const response = await axios.post(`http://localhost:8080/api/v1/flights/book/${flight.id}`, {
                 email: userEmail,
                 useMiles: useMiles,
                 isMemberRequest: false,

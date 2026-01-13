@@ -19,7 +19,7 @@ const AdminAddFlight = () => {
 
  const handleSave = async () => {
     try {
-        const response = await axios.post('http://localhost:8080/api/flights', flightData, {
+        const response = await axios.post('http://localhost:8080/api/v1/flights', flightData, {
             headers: { 'x-user-role': 'ADMIN' } // Backend güvenliği için
         });
         alert(response.data.message);

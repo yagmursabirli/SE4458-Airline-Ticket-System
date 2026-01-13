@@ -16,18 +16,16 @@ with open('encoders.pkl', 'rb') as f:
 def predict():
     data = request.get_json()
     
-    # React'ten gelen verileri dataset formatına uyduralım
-    # Not: React formunda olmayanlar için datasetin en sık kullanılan değerlerini (default) veriyoruz
     input_data = pd.DataFrame([{
-        'airline': data.get('airline', 'Air_India'),
-        'source_city': data.get('fromCity', 'Delhi'),
-        'departure_time': 'Morning',
-        'stops': 'one',
-        'arrival_time': 'Evening',
-        'destination_city': data.get('toCity', 'Mumbai'),
+        'airline': data.get('airline'), # Artık React'ten geliyor
+        'source_city': data.get('fromCity'),
+        'departure_time': data.get('departure_time'), # Artık React'ten geliyor
+        'stops': data.get('stops'), # Artık React'ten geliyor
+        'arrival_time': 'Evening', # İstersen bunu da React'e ekle
+        'destination_city': data.get('toCity'),
         'class': 'Economy',
         'duration': float(data.get('duration', 2.0)),
-        'days_left': 10
+        'days_left': 15 # Uçuşa kalan gün sayısı tahmini etkiler
     }])
 
     # Kategorik verileri sayıya çevir
@@ -39,4 +37,8 @@ def predict():
     prediction = model.predict(input_data)
     return jsonify({'predicted_price': round(float(prediction[0]), 2)})
 
+if __name__ == '__main__':
+    # host='0.0.0.0' mutlaka olmalı, yoksa Docker dışından gelen istekleri (React) görmez
+    app.run(host='0.0.0.0', port=5001)
+    
 app.run(port=5001)

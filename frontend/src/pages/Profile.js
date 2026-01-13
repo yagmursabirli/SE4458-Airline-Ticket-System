@@ -17,7 +17,7 @@ const Profile = ({ userEmail }) => {
     const fetchProfile = async () => {
         if (!userEmail || userEmail === "" || userEmail === "undefined") return;
         try {
-            const response = await axios.get(`http://localhost:8080/api/user/profile/${userEmail}`);
+            const response = await axios.get(`http://localhost:8080/api/v1/user/profile/${userEmail}`);
             setProfileData(response.data);
         } catch (error) {
             console.error("Profil yüklenemedi", error);
@@ -34,7 +34,7 @@ const Profile = ({ userEmail }) => {
             return;
         }
         try {
-            const response = await axios.get('http://localhost:8080/api/flights/search', { params: searchParams });
+            const response = await axios.get('http://localhost:8080/api/v1/flights/search', { params: searchParams });
             setResults(response.data);
         } catch (error) {
             alert("Uçuşlar listelenemedi!");

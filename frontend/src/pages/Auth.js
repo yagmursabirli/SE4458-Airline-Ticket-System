@@ -31,7 +31,7 @@ const Auth = ({ onLoginSuccess }) => {
 
                 if (isMilesSmilesChecked) {
                     try {
-                        await axios.post('http://localhost:8080/api/user/register-loyalty', {
+                        await axios.post('http://localhost:8080/api/v1/user/register-loyalty', {
                             email: formData.email,
                             wantsMembership: true
                         });
