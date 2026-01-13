@@ -17,7 +17,7 @@ const Profile = ({ userEmail }) => {
     const fetchProfile = async () => {
         if (!userEmail || userEmail === "" || userEmail === "undefined") return;
         try {
-            const response = await axios.get(`http://localhost:8080/api/user/profile/${userEmail}`);
+            const response = await axios.get(`http://localhost:8080/api/v1/user/profile/${userEmail}`);
             setProfileData(response.data);
         } catch (error) {
             console.error("Profil yüklenemedi", error);
@@ -34,7 +34,7 @@ const Profile = ({ userEmail }) => {
             return;
         }
         try {
-            const response = await axios.get('http://localhost:8080/api/flights/search', { params: searchParams });
+            const response = await axios.get('http://localhost:8080/api/v1/flights/search', { params: searchParams });
             setResults(response.data);
         } catch (error) {
             alert("Uçuşlar listelenemedi!");
@@ -44,25 +44,25 @@ const Profile = ({ userEmail }) => {
     const isMilesSmilesMember = profileData.membershipType && profileData.membershipType !== 'Misafir';
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Container maxWidth="lg" sx={{ mt: 2 }}>
             {/* ÜST ROW: KART VE GEÇMİŞ */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} md={6}>
+            <Grid container spacing={4} sx={{ mb: 4 }}>
+                <Grid item xs={12} md={8}>
                     {isMilesSmilesMember ? (
-                        <Paper elevation={6} sx={{ p: 4, height: '220px', borderRadius: 4, background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <Paper elevation={6} sx={{ p: 4, height: '220px',  borderRadius: 4, background: 'linear-gradient(45deg, #1a237e 30%, #283593 90%)', color: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <Box><Typography variant="h5">Skyline Miles & Smiles</Typography><Typography variant="body2">{profileData.membershipType} Member</Typography></Box>
                             <Box><Typography variant="caption">MİL BAKİYESİ</Typography><Typography variant="h3" sx={{ fontWeight: 'bold' }}>{profileData.milesBalance}</Typography></Box>
                         </Paper>
                     ) : (
-                        <Paper elevation={2} sx={{ p: 4, height: '220px', borderRadius: 4, textAlign: 'center', bgcolor: '#f5f5f5', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <Paper elevation={2} sx={{ p: 4, height: '220px',  borderRadius: 4, textAlign: 'center', bgcolor: '#f5f5f5', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <Typography variant="h6">Sadakat Programına Katılın</Typography>
                             <Button variant="contained" color="secondary" sx={{ mt: 2 }}>ÜYE OL</Button>
                         </Paper>
                     )}
                 </Grid>
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2, height: '220px', borderRadius: 4, overflowY: 'auto' }}>
-                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>✈️ Seyahat Geçmişim</Typography>
+                <Grid item xs={12} md={8}>
+                    <Paper sx={{ p: 2, height: '250px', width:'700px', borderRadius: 4, overflowY: 'auto' }}>
+                        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>✈️ Seyahatlerim</Typography>
                         <List dense>
                             {profileData.bookings.length > 0 ? profileData.bookings.map((booking) => (
                                 <ListItem key={booking.id} divider>

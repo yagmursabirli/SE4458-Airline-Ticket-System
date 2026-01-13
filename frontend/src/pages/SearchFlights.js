@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
-import { Grid, Card, Box, Typography, FormControlLabel, Switch, Button, Divider } from '@mui/material';
+import { Grid, Card, Box, Typography, FormControlLabel, Switch, Button, Divider, Chip } from '@mui/material';
 import axios from 'axios';
 
 // Her bir uçuş satırı için ayrı bir bileşen oluşturuyoruz
 const FlightRow = ({ flight, userEmail, passengers, onBookingSuccess }) => {
-    // Bu state sadece bu satıra (uçuşa) özeldir
     const [useMiles, setUseMiles] = useState(false);
+
+    // Veritabanındaki 'stops' değerini kullanıcı dostu metne çeviren fonksiyon
+    const getStopsLabel = (stops) => {
+        switch (stops) {
+            case 'zero': return 'Aktarmasız';
+            case 'one': return '1 Aktarma';
+            case 'two_or_more': return '2+ Aktarma';
+            default: return 'Direkt';
+        }
+    };
 
     const handleBooking = async () => {
         if (!userEmail || userEmail === "undefined") {
@@ -14,7 +23,7 @@ const FlightRow = ({ flight, userEmail, passengers, onBookingSuccess }) => {
         }
 
         try {
-            const response = await axios.post(`http://localhost:8080/api/flights/book/${flight.id}`, {
+            const response = await axios.post(`http://localhost:8080/api/v1/flights/book/${flight.id}`, {
                 email: userEmail,
                 useMiles: useMiles,
                 isMemberRequest: false,
@@ -39,9 +48,16 @@ const FlightRow = ({ flight, userEmail, passengers, onBookingSuccess }) => {
                 border: '1px solid #eee'
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Box sx={{ textAlign: 'center', minWidth: '80px' }}>
+                    <Box sx={{ textAlign: 'center', minWidth: '100px' }}>
                         <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>{flight.flightCode}</Typography>
-                        <Typography variant="caption" color="textSecondary">Uçuş Kodu</Typography>
+                        {/* AKTARMA BİLGİSİ BURAYA EKLENDİ */}
+                        <Chip 
+                            label={getStopsLabel(flight.stops)} 
+                            size="small" 
+                            color={flight.stops === 'zero' ? "success" : "warning"}
+                            variant="outlined"
+                            sx={{ mt: 0.5, fontWeight: 'bold', fontSize: '0.7rem' }}
+                        />
                     </Box>
                     
                     <Divider orientation="vertical" flexItem />
@@ -49,7 +65,7 @@ const FlightRow = ({ flight, userEmail, passengers, onBookingSuccess }) => {
                     <Box>
                         <Typography variant="h5" sx={{ fontWeight: '500' }}>{flight.fromCity} ➔ {flight.toCity}</Typography>
                         <Typography variant="body2" color="textSecondary">
-                            Tarih: {flight.flightDate} | Kapasite: <strong>{flight.capacity} Koltuk</strong>
+                            Tarih: {flight.flightDate} | Süre: <strong>{flight.duration}s</strong> | Kapasite: <strong>{flight.capacity} Koltuk</strong>
                         </Typography>
                     </Box>
                 </Box>
@@ -81,7 +97,6 @@ const FlightRow = ({ flight, userEmail, passengers, onBookingSuccess }) => {
 
 // Ana Arama Sonuçları Bileşeni
 const SearchFlights = ({ results, userEmail, passengers, onBookingSuccess }) => {
-    // Sıralamanın bozulmaması için ID'ye göre sabitliyoruz
     const sortedResults = [...results].sort((a, b) => a.id - b.id);
 
     return (

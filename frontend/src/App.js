@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
-import { getCurrentUser, fetchUserAttributes, fetchAuthSession } from 'aws-amplify/auth';
+import { getCurrentUser, fetchUserAttributes, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import awsConfig from './aws-config';
-import { signOut } from 'aws-amplify/auth';
 
 // Sayfalar
 import Auth from './pages/Auth';
@@ -18,7 +17,7 @@ Amplify.configure(awsConfig);
 function App() {
   const [user, setUser] = useState(null);
   const [userEmail, setUserEmail] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false); // Admin durumu için state
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const isAdminDomain = window.location.port === "3001";
@@ -27,65 +26,77 @@ function App() {
     const checkUser = async () => {
       try {
         const currentUser = await getCurrentUser();
-        const attributes = await fetchUserAttributes();
-        
-        // Rol Kontrolü: Sayfa yenilendiğinde Cognito gruplarına tekrar bakıyoruz
         const session = await fetchAuthSession();
+        const attributes = await fetchUserAttributes();
         const groups = session.tokens?.accessToken?.payload['cognito:groups'] || [];
-        
+        const userIsAdmin = groups.includes('Admins');
+
+        // KRİTİK KONTROL: Eğer admin portundaysak ama kullanıcı admin değilse logout yap
+        if (isAdminDomain && !userIsAdmin) {
+          console.warn("Admin olmayan kullanıcı admin portuna erişemez.");
+          await handleLogout();
+          return;
+        }
+
         setUser(currentUser);
         setUserEmail(attributes.email || currentUser.username);
-        setIsAdmin(groups.includes('Admins')); // 'Admins' grubundaysa true
+        setIsAdmin(userIsAdmin);
       } catch (err) {
-        console.log("Oturum yok");
+        console.log("Oturum bulunamadı veya geçersiz.");
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
     checkUser();
-  }, []);
+  }, [isAdminDomain]);
 
   const handleLoginSuccess = async (userData) => {
     try {
       const attributes = await fetchUserAttributes();
-      const email = attributes.email || userData?.signInDetails?.loginId || userData?.username;
-      
-      // Auth.js'den gelen isAdmin verisini kullanıyoruz
+      const session = await fetchAuthSession();
+      const groups = session.tokens?.accessToken?.payload['cognito:groups'] || [];
+      const userIsAdmin = groups.includes('Admins');
+
+      // Admin portunda giriş yapılıyorsa ama kullanıcı admin değilse engelle
+      if (isAdminDomain && !userIsAdmin) {
+        alert("Bu hesap yönetici yetkisine sahip değil!");
+        await signOut();
+        return;
+      }
+
       setUser(userData);
-      setUserEmail(email);
-      setIsAdmin(userData.isAdmin || false); 
-      
-      console.log("Giriş başarılı. Admin Yetkisi:", userData.isAdmin);
+      setUserEmail(attributes.email || userData.username);
+      setIsAdmin(userIsAdmin);
     } catch (error) {
-      setUser(userData);
-      setIsAdmin(userData.isAdmin || false);
+      console.error("Login attribute hatası:", error);
     }
   };
 
   const handleLogout = async () => {
     try {
-        await signOut(); // AWS oturumunu gerçekten kapat
-        setUser(null);
-        setUserEmail("");
-        setIsAdmin(false);
-        // Sayfayı tamamen temizleyerek kök dizine (login ekranına) gönder
-        window.location.href = window.location.origin; 
+      await signOut();
+      setUser(null);
+      setUserEmail("");
+      setIsAdmin(false);
+      window.location.href = window.location.origin;
     } catch (error) {
-        console.error("Çıkış hatası:", error);
+      console.error("Çıkış hatası:", error);
     }
-};
+  };
 
   if (loading) return null;
 
-  // --- ADMIN DOMAIN (PORT 3001) MANTIĞI ---
-  if (isAdminDomain) {
-    return (
-      <Router>
-        <Routes>
-          <Route path="/" element={
-            !user ? (
-              <Auth onLoginSuccess={handleLoginSuccess} />
-            ) : (
+  return (
+    <Router>
+      <Routes>
+        {/* LOGIN KONTROLÜ: Eğer kullanıcı yoksa her zaman Auth (Login) sayfasını göster */}
+        <Route path="/" element={
+          !user ? (
+            <Auth onLoginSuccess={handleLoginSuccess} />
+          ) : (
+            isAdminDomain ? (
+              // ADMIN PORTU (3001) İÇERİĞİ
               isAdmin ? (
                 <>
                   <Navbar onLogout={handleLogout} userEmail={userEmail} />
@@ -97,43 +108,18 @@ function App() {
                   </Container>
                 </>
               ) : (
-  <Box sx={{ p: 5, textAlign: 'center' }}>
-    <Typography variant="h5" color="error" gutterBottom>
-      YETKİSİZ ERİŞİM
-    </Typography>
-    <Typography sx={{ mb: 2 }}>
-      Bu alan sadece yönetici yetkisine sahip kullanıcılar içindir.
-    </Typography>
-    {/* handleLogout'u burada tetikliyoruz */}
-    <Button variant="contained" onClick={handleLogout}> 
-       OTURUMU KAPAT VE YENİDEN DENE
-    </Button>
-  </Box>
-)
+                <Navigate to="/" /> // Yetkisizse login'e at
+              )
+            ) : (
+              // USER PORTU (3000) İÇERİĞİ
+              <>
+                <Navbar onLogout={handleLogout} userEmail={userEmail} />
+                <Container sx={{ mt: 4 }}>
+                  <Profile userEmail={userEmail} />
+                  {/* Buraya SearchFlights bileşenini ekleyebilirsin */}
+                </Container>
+              </>
             )
-          } />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
-    );
-  }
-
-  // --- USER DOMAIN (PORT 3000) MANTIĞI ---
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={
-          !user ? (
-            <Auth onLoginSuccess={handleLoginSuccess} />
-          ) : (
-            <>
-              <Navbar onLogout={handleLogout} userEmail={userEmail} />
-              <Container sx={{ mt: 4 }}>
-                <Profile userEmail={userEmail} />
-                <Box sx={{ my: 4 }} />
-               
-              </Container>
-            </>
           )
         } />
         <Route path="*" element={<Navigate to="/" />} />

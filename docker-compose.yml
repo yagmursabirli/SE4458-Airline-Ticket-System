@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # Flight Microservice
+  flight-service:
+    build: ./backend/flight-service
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/flight-service/.env
+    restart: always
+
+  # Machine Learning Service
+  ml-service:
+    build: ./ml-model
+    ports:
+      - "5001:5001"
+    restart: always
+
+  # Kullanıcı Arayüzü (Port 3000)
+  frontend-user:
+    build: ./frontend
+    command: npm run start-user
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    restart: always
+
+  # Admin Arayüzü (Port 3001)
+  frontend-admin:
+    build: ./frontend
+    command: npm run start-admin
+    ports:
+      - "3001:3001"
+    stdin_open: true
+    restart: always

@@ -1,15 +1,18 @@
 const { Sequelize, DataTypes } = require('sequelize');
+const path = require('path');
+// Komutun çalıştırıldığı dizindeki .env'i oku (En garantici yöntem)
+require('dotenv').config({ path: path.join(process.cwd(), '.env') }); 
 
-// Bilgileri buraya direkt yaz (Test amaçlı)
+
 const sequelize = new Sequelize(
-  'postgres', // Veritabanı adın (genelde postgres)
-  'postgres', // Master username
-  'Badem300124!', // AWS'de belirlediğin şifre
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
   {
-    host: 'airline-ticketing-db.c520kqeg2b1w.eu-north-1.rds.amazonaws.com', // RDS sayfasındaki Endpoint
+    host: process.env.DB_HOST,
     dialect: 'postgres',
-    port: 5432,
-    logging: console.log,
+    port: process.env.DB_PORT,
+    logging: false, 
     dialectOptions: {
       ssl: {
         require: true,
@@ -27,7 +30,13 @@ const Flight = sequelize.define('Flight', {
   duration: { type: DataTypes.STRING, allowNull: false },
   price: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   capacity: { type: DataTypes.INTEGER, allowNull: false },
-  predictedPrice: { type: DataTypes.DECIMAL(10, 2) }
+  predictedPrice: { type: DataTypes.DECIMAL(10, 2) },
+  
+  stops: { 
+    type: DataTypes.STRING, 
+    allowNull: false, 
+    defaultValue: 'zero' 
+  }
 });
 
 sequelize.sync({ alter: true })
