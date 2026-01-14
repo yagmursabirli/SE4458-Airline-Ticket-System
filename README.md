@@ -355,7 +355,7 @@ Notification Worker
 ML Price Predictor
 
 
-Docker images are not committed, only Dockerfiles, as required.
+Docker images are not committed, only Dockerfiles are committed.
 
 
 ---
@@ -364,8 +364,6 @@ Docker images are not committed, only Dockerfiles, as required.
 
 The system is configured for local execution.
 
-
-Cloud deployment was not completed.
 
 
 ---
