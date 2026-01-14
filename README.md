@@ -43,6 +43,7 @@ ML-assisted decision support
 The project strictly follows the architectural and functional requirements defined in the course specification.
 
 
+---
 # 🏗 System Design & Architecture
 
 
@@ -70,6 +71,7 @@ Path-based API versioning (/api/v1)
 Implements in-memory caching for flight search results to reduce database latency and repeated queries.
 
 
+---
 **🔹 Flight Service (Backend)**
 
 
@@ -94,6 +96,7 @@ Uses database transactions to prevent overbooking.
 Persists data in AWS RDS (PostgreSQL).
 
 
+---
 **🔹 Notification Worker**
 
 
@@ -115,6 +118,7 @@ Mileage update notifications
 Enables asynchronous, non-blocking user operations.
 
 
+---
 **🔹 ML Price Predictor**
 
 
@@ -134,6 +138,7 @@ Route characteristics
 
 
 Integrated into the Admin workflow to assist pricing decisions.
+
 
 ---
 **🔹 IAM (Identity & Access Management)**
@@ -240,6 +245,7 @@ The complete ER Diagram is included in the repository as a PNG file and referenc
 
 
 
+---
 **💡 Assumptions & Design Decisions**
 
 
@@ -273,24 +279,7 @@ External Miles Update:
 Partner airlines can update user miles via an authenticated external API.
 
 
-**🛠 Issues Encountered & Solutions**
-
-
-🚨 Asynchronous Email Latency
-
-
-Problem:
-
-
-Sending emails synchronously during user registration caused delays.
-
-
-Solution:
-
-
-Implemented a queue-based notification system using AWS SQS, allowing immediate responses while emails are processed in the background.
-
-
+---
 **🔄 Concurrency in Ticket Booking**
 
 
@@ -315,6 +304,7 @@ Decrease seat count
 Confirm booking
 
 
+---
 **🌐 Cross-Origin Resource Sharing (CORS)**
 
 
@@ -330,6 +320,7 @@ Solution:
 Configured centralized CORS policies at the API Gateway level, allowing only verified origins.
 
 
+---
 **🧠 Caching Strategy**
 
 
@@ -345,6 +336,7 @@ Flight search results
 This significantly reduces database load and improves response time for frequent queries.
 
 
+---
 **🐳 Dockerization**
 
 
@@ -366,6 +358,7 @@ ML Price Predictor
 Docker images are not committed, only Dockerfiles, as required.
 
 
+---
 **🚀 Deployment Status**
 
 
@@ -375,6 +368,7 @@ The system is configured for local execution.
 Cloud deployment was not completed.
 
 
+---
 
 Yağmur Sabırlı
 
