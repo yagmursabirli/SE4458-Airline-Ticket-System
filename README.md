@@ -241,7 +241,7 @@ Membership type
 **📌 ER Diagram**
 
 
-The complete ER Diagram is included in the repository as a PNG file and referenced in this documentation.
+The complete ER Diagram is included in the repository as a PNG file --> erDiagram.png
 
 
 
