@@ -41,6 +41,20 @@ const Profile = ({ userEmail }) => {
         }
     };
 
+    const handleRegisterLoyalty = async () => {
+    try {
+        const response = await axios.post('http://localhost:8080/api/v1/user/register-loyalty', {
+            email: userEmail,
+            wantsMembership: true
+        });
+        alert(response.data.message);
+        fetchProfile(); // Profili yenile ki kart görseli değişsin
+    } catch (error) {
+        console.error("Üyelik oluşturulamadı", error);
+        alert("Üyelik işlemi sırasında bir hata oluştu.");
+    }
+};
+
     const isMilesSmilesMember = profileData.membershipType && profileData.membershipType !== 'Misafir';
 
     return (
@@ -56,7 +70,14 @@ const Profile = ({ userEmail }) => {
                     ) : (
                         <Paper elevation={2} sx={{ p: 4, height: '220px',  borderRadius: 4, textAlign: 'center', bgcolor: '#f5f5f5', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <Typography variant="h6">Sadakat Programına Katılın</Typography>
-                            <Button variant="contained" color="secondary" sx={{ mt: 2 }}>ÜYE OL</Button>
+                            <Button 
+    variant="contained" 
+    color="secondary" 
+    sx={{ mt: 2 }}
+    onClick={handleRegisterLoyalty} 
+>
+    ÜYE OL
+</Button>
                         </Paper>
                     )}
                 </Grid>

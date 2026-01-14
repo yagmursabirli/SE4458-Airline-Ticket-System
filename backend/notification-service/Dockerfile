@@ -3,5 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-# Sadece bu servisin ana dosyasını başlat 
+
+
+
 CMD ["node", "notificationWorker.js"]
